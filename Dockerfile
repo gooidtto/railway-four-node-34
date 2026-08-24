@@ -3,7 +3,6 @@ ARG XRAY_VERSION=26.3.27
 ARG CLOUDFLARED_VERSION=2026.7.3
 FROM ghcr.io/xtls/xray-core:${XRAY_VERSION} AS xray
 FROM cloudflare/cloudflared:${CLOUDFLARED_VERSION} AS cloudflared
-
 FROM python:3.12-alpine3.22
 ARG XRAY_VERSION
 ARG CLOUDFLARED_VERSION
@@ -15,8 +14,8 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=railway-production-v5 \
-    SOURCE_BUILD=6afe981f6063e8c7f0db4b7791dcd9b81808fa37 \
+ENV BUILD_ID=fix-5node-lifecycle-v1 \
+    SOURCE_BUILD=main-baseline \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
@@ -28,17 +27,20 @@ ENV BUILD_ID=railway-production-v5 \
     REALITY_FINGERPRINT=chrome \
     REALITY_XHTTP_SNI=www.apple.com \
     REALITY_XHTTP_TARGET=www.apple.com:443 \
+    REALITY_GRPC_SNI=www.bing.com \
+    REALITY_GRPC_TARGET=www.bing.com:443 \
+    GRPC_SERVICE_NAME=grpc-service \
     XHTTP_PATH=/xhttp \
     READY_TIMEOUT=90 \
     CLOUDFLARE_READY_TIMEOUT=45 \
     GATEWAY_MAX_CONNECTIONS=512 \
-    GATEWAY_READ_TIMEOUT=15 \
+    GATEWAY_READ_TIMEOUT=20 \
     GATEWAY_UPSTREAM_TIMEOUT=10 \
     GATEWAY_IDLE_TIMEOUT=900 \
-    GATEWAY_MAX_INITIAL=65536 \
-    GATEWAY_LOGLEVEL=WARNING
+    GATEWAY_MAX_INITIAL=131072 \
+    GATEWAY_LOGLEVEL=INFO
 RUN echo "SOURCE_BUILD=${SOURCE_BUILD} BUILD_ID=${BUILD_ID}"
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=8).read()"
 WORKDIR /opt/xray
-ENTRYPOINT ["/opt/xray/scripts/guard.sh"]
+ENTRYPOINT ["/opt/xray/scripts/boot.sh"]
