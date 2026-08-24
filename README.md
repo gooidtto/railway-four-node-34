@@ -23,7 +23,7 @@ A single-service Railway deployment that provides an Xray gateway, dynamic Railw
 
 5. **Cloudflare XHTTP TLS**, enabled only when the Cloudflare Tunnel configuration is complete.
 
-The public connection to Node 5 is HTTPS/TLS at the Cloudflare hostname. Cloudflare Tunnel forwards the published application to the local XHTTP origin over HTTP. The local Xray Node 5 therefore uses `network=xhttp`, `security=none`; TLS is terminated at the Cloudflare edge. Cloudflare supports published HTTP/HTTPS applications through Tunnel and maps a public hostname to a local service. citeturn0search0turn0search3
+The public connection to Node 5 is HTTPS/TLS at the Cloudflare hostname. Cloudflare Tunnel forwards the published application to the local XHTTP origin over HTTP. The local Xray Node 5 therefore uses `network=xhttp`, `security=none`; public TLS is terminated at Cloudflare.
 
 Railway networking is discovered at runtime. Public domains, TCP proxy hosts/ports, project identifiers, and generated credentials are not hard-coded.
 
@@ -31,10 +31,11 @@ Railway networking is discovered at runtime. Public domains, TCP proxy hosts/por
 
 1. Deploy the repository to a Railway project.
 2. Add a persistent Volume mounted at `/data`.
-3. Create a Railway Public Domain.
-4. Create a Railway TCP Proxy targeting internal port `8080`.
-5. Redeploy after networking resources are available.
-6. Verify `GET /ready` returns HTTP `200` before using the subscription endpoint.
+3. Create the Railway Public Domain.
+4. Create a Railway TCP Proxy whose **target port is `8080`**.
+5. After changing or recreating Railway Networking, **redeploy the service** so the new environment values are authoritative.
+6. Confirm the startup log reports `RAILWAY_NETWORKING_SOURCE=current-deployment-environment` and `RAILWAY_TCP_PROXY_EXPECTED_TARGET=8080`.
+7. Verify `GET /ready` returns HTTP `200` before using the subscription endpoint.
 
 ### Cloudflare node
 
@@ -45,17 +46,37 @@ CLOUDFLARE_TUNNEL_TOKEN
 CLOUDFLARE_TUNNEL_ID
 CLOUDFLARE_PUBLIC_HOSTNAME
 CLOUDFLARE_ORIGIN_SERVICE
-WS_PORT
-WS_PATH
+CLOUDFLARE_XHTTP_PORT
+CLOUDFLARE_XHTTP_PATH
 ```
 
-For the Cloudflare published application, configure the tunnel hostname to the local XHTTP service represented by `CLOUDFLARE_ORIGIN_SERVICE`/`WS_PORT`, using the XHTTP path in `WS_PATH`. The public hostname remains HTTPS; the origin service may be HTTP because TLS is terminated at Cloudflare. Cloudflare documents HTTP and HTTPS as supported published-application service types. citeturn0search3turn0search6
+The older `WS_PORT` / `WS_PATH` names remain accepted as compatibility fallbacks, but new deployments should use the explicit `CLOUDFLARE_XHTTP_*` names.
+
+The Cloudflare published application should map the public hostname to the local HTTP XHTTP origin represented by `CLOUDFLARE_ORIGIN_SERVICE` and `CLOUDFLARE_XHTTP_PORT`, using `CLOUDFLARE_XHTTP_PATH`. The public hostname remains HTTPS while the local origin is HTTP.
 
 ## Runtime invariants
 
-The runtime treats current Railway networking as authoritative. Persistent state is used for identity continuity and change detection, not as an authority for stale endpoints.
+The runtime treats current Railway networking as authoritative. Persistent `/data` state is used for identity continuity and change detection, not as an authority for stale endpoints.
 
-The gateway validates the generated subscription against the current runtime before serving it. A valid runtime must expose either 4 or 5 nodes, and the subscription count must match the runtime node count.
+At every startup:
+
+```text
+current Railway Networking
+        ↓
+runtime generation
+        ↓
+subscription generation
+        ↓
+endpoint / UUID / node-count validation
+        ↓
+Xray configuration test
+        ↓
+local listener readiness
+        ↓
+Gateway
+```
+
+A valid runtime must expose either 4 or 5 nodes, and the subscription count must match the runtime node count.
 
 The expected subscription order is:
 
@@ -67,10 +88,12 @@ The expected subscription order is:
 5: cloudflare-xhttp-tls (when enabled)
 ```
 
+Node 2, Node 3, and Node 4 intentionally share the current Railway TCP Proxy endpoint. The Gateway on `8080` routes their TLS SNI to `10087`, `10088`, and `10089` respectively.
+
 ## Health checks
 
 - `/health` — process-level health response.
-- `/ready` — runtime readiness, generated subscription validation, local Xray listener checks, and Cloudflare readiness when enabled.
+- `/ready` — generated subscription validation, local Xray listener checks, and Cloudflare readiness when enabled.
 
 ## Repository layout
 
@@ -78,11 +101,10 @@ The expected subscription order is:
 .
 ├── .github/workflows/       # CI/release packaging
 ├── config/                  # Static runtime inputs
-├── scripts/                 # Boot, generation, gateway, guard and runtime logic
+├── scripts/                 # Boot, generation, gateway and runtime logic
 ├── site/                    # Minimal HTTP landing page
 ├── Dockerfile               # Reproducible runtime image
 ├── railway.toml             # Railway deployment configuration
-├── RELEASE-MANIFEST.json    # Release metadata
 ├── STRUCTURE.md             # Repository structure reference
 ├── .gitignore               # Local/generated-file exclusions
 └── .dockerignore            # Docker build-context exclusions
