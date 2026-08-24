@@ -3,7 +3,7 @@ name: Package Release
 on:
   push:
     branches:
-      - fix-5node-lifecycle-2026-08-24
+      - release-5node-xhttp-cloudflare-v3-2026-08-24
   workflow_dispatch:
 
 jobs:
@@ -18,11 +18,11 @@ jobs:
         run: |
           set -eu
           mkdir -p dist
-          git archive --format=zip --output=dist/railway-four-node-34-fix-5node-lifecycle-2026-08-24.zip HEAD
-          sha256sum dist/railway-four-node-34-fix-5node-lifecycle-2026-08-24.zip | tee dist/SHA256SUMS.txt
+          git archive --format=zip --output=dist/railway-four-node-34-release-5node-xhttp-cloudflare-v3-2026-08-24.zip HEAD
+          sha256sum dist/railway-four-node-34-release-5node-xhttp-cloudflare-v3-2026-08-24.zip | tee dist/SHA256SUMS.txt
       - name: Upload release archive
         uses: actions/upload-artifact@v4
         with:
-          name: railway-four-node-34-fix-5node-lifecycle-2026-08-24
+          name: railway-four-node-34-release-5node-xhttp-cloudflare-v3-2026-08-24
           path: dist/
           if-no-files-found: error
