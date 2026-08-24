@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 ARG XRAY_VERSION=26.3.27
 ARG CLOUDFLARED_VERSION=2026.7.3
-ARG REPOSITORY_RELEASE=upload-baseline-2026-08-24
+ARG REPOSITORY_RELEASE=repo-current
 FROM ghcr.io/xtls/xray-core:${XRAY_VERSION} AS xray
 FROM cloudflare/cloudflared:${CLOUDFLARED_VERSION} AS cloudflared
 FROM python:3.12-alpine3.22
@@ -38,26 +38,23 @@ ENV XRAY_VERSION=${XRAY_VERSION} \
     GATEWAY_IDLE_TIMEOUT=900 \
     GATEWAY_MAX_INITIAL=131072 \
     GATEWAY_LOGLEVEL=INFO
-RUN apk add --no-cache openssl ca-certificates && \
-    mkdir -p /etc/xray /data /opt/xray/scripts /opt/xray/config /opt/xray/site
+RUN apk add --no-cache openssl ca-certificates && mkdir -p /etc/xray /data /opt/xray/scripts /opt/xray/config /opt/xray/site
 COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
 COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
-# Build-time integrity checks. Runtime values must come from the checked-out repository
-# and current Railway environment; the image must never rewrite protocol definitions.
 RUN python3 -m py_compile /opt/xray/scripts/*.py && \
-    grep -q 'upload-baseline-2026-08-24' /opt/xray/scripts/generate.py && \
-    grep -q 'upload-baseline-2026-08-24' /opt/xray/scripts/start.sh && \
+    grep -q 'repo-current' /opt/xray/scripts/generate.py && \
+    grep -q 'repo-current' /opt/xray/scripts/start.sh && \
     grep -q 'vless-xhttp-cloudflare' /opt/xray/scripts/generate.py && \
     grep -q 'type":"xhttp"' /opt/xray/scripts/generate.py && \
     grep -q 'cloudflare-xhttp-tls' /opt/xray/scripts/generate.py && \
+    grep -q '127.0.0.1", 10087' /opt/xray/scripts/gateway.py && \
+    grep -q '127.0.0.1", 10088' /opt/xray/scripts/gateway.py && \
+    grep -q '127.0.0.1", 10089' /opt/xray/scripts/gateway.py && \
     ! grep -q 'cloudflare-ws-tls' /opt/xray/scripts/generate.py && \
     ! grep -q 'type":"ws"' /opt/xray/scripts/generate.py && \
-    grep -q '10087' /opt/xray/scripts/gateway.py && \
-    grep -q '10088' /opt/xray/scripts/gateway.py && \
-    grep -q '10089' /opt/xray/scripts/gateway.py && \
     chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && \
     chmod 0644 /opt/xray/config/* /opt/xray/site/*
 RUN printf 'REPOSITORY_RELEASE=%s\nBUILD_ID=%s\nSOURCE_BUILD=%s\nXRAY_VERSION=%s\nCLOUDFLARED_VERSION=%s\n' "$REPOSITORY_RELEASE" "$BUILD_ID" "$SOURCE_BUILD" "$XRAY_VERSION" "$CLOUDFLARED_VERSION" > /opt/xray/BUILD-INFO
