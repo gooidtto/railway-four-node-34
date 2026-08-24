@@ -13,18 +13,18 @@ COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
-RUN sed -i \
-    -e 's/logging.basicConfig(level=/logging.basicConfig(stream=__import__("sys").stdout, level=/' \
-    -e 's/log\\.warning("TCP_ACCEPT/log.info("TCP_ACCEPT/' \
-    -e 's/log\\.warning("ROUTE_SELECTED/log.info("ROUTE_SELECTED/' \
-    -e 's/log\\.warning("UPSTREAM_CONNECT_OK/log.info("UPSTREAM_CONNECT_OK/' \
-    -e 's/log\\.warning("INITIAL_FORWARDED/log.debug("INITIAL_FORWARDED/' \
-    -e 's/log\\.warning("SUBSCRIPTION_HTTP_RENDER=PASS/log.info("SUBSCRIPTION_HTTP_RENDER=PASS/' \
-    /opt/xray/scripts/gateway.py && \
-    python3 -m py_compile /opt/xray/scripts/*.py && \
-    chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-xhttp-cloudflare-v2 \
-    SOURCE_BUILD=fix-5node-xhttp-cloudflare-v1 \
+# Keep runtime source immutable: never patch protocol definitions during image build.
+# The build must fail if Node 5 regresses to the deprecated WebSocket transport.
+RUN python3 -m py_compile /opt/xray/scripts/*.py && \
+    grep -q 'vless-xhttp-cloudflare' /opt/xray/scripts/generate.py && \
+    grep -q 'type":"xhttp"' /opt/xray/scripts/generate.py && \
+    grep -q 'cloudflare-xhttp-tls' /opt/xray/scripts/generate.py && \
+    ! grep -q 'cloudflare-ws-tls' /opt/xray/scripts/generate.py && \
+    ! grep -q 'type":"ws"' /opt/xray/scripts/generate.py && \
+    chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && \
+    chmod 0644 /opt/xray/config/* /opt/xray/site/*
+ENV BUILD_ID=fix-5node-xhttp-cloudflare-v3 \
+    SOURCE_BUILD=fix-5node-xhttp-cloudflare-v2 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
@@ -48,7 +48,7 @@ ENV BUILD_ID=fix-5node-xhttp-cloudflare-v2 \
     GATEWAY_IDLE_TIMEOUT=900 \
     GATEWAY_MAX_INITIAL=131072 \
     GATEWAY_LOGLEVEL=INFO
-RUN echo "SOURCE_BUILD=${SOURCE_BUILD} BUILD_ID=${BUILD_ID}"
+RUN echo "SOURCE_BUILD=${SOURCE_BUILD} BUILD_ID=${BUILD_ID} NODE5=VLESS_XHTTP_TLS_CLOUDFLARE"
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=8).read()"
 WORKDIR /opt/xray
