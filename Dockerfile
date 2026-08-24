@@ -15,7 +15,7 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=stable-node5-grpc-reality-v5 \
+ENV BUILD_ID=stable-node5-grpc-reality-v7 \
     SOURCE_BUILD=main-hardened-v4 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
@@ -44,4 +44,4 @@ RUN echo "SOURCE_BUILD=${SOURCE_BUILD} BUILD_ID=${BUILD_ID}"
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=8).read()"
 WORKDIR /opt/xray
-ENTRYPOINT ["/opt/xray/scripts/guard.sh"]
+ENTRYPOINT ["/opt/xray/scripts/boot.sh"]
