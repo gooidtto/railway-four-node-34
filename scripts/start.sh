@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 umask 077
-BUILD_ID="fix-5node-xhttp-cloudflare-v1"
-SOURCE_BUILD="fix-5node-lifecycle-v3"
+BUILD_ID="fix-5node-xhttp-cloudflare-v3"
+SOURCE_BUILD="fix-5node-xhttp-cloudflare-v2"
 D="${RAILWAY_VOLUME_MOUNT_PATH:-${DATA_DIR:-/data}}"
 C="${XRAY_CONFIG:-${D}/config.json}"
 mkdir -p "$D" "$(dirname "$C")"
@@ -52,6 +52,8 @@ for idx in (1,2,3):
 if expected==5:
     cf=runtime.get("cloudflare",{}); host=str(cf.get("public_hostname","") or "")
     if ids[4] != (host,"443"): raise SystemExit("FATAL: NODE5 endpoint does not match current Cloudflare hostname")
+    if "type=xhttp" not in lines[4] or "#VLESS%20XHTTP%20TLS%20%C2%B7%20Cloudflare%20Tunnel" not in lines[4]: raise SystemExit("FATAL: NODE5 subscription is not VLESS XHTTP TLS Cloudflare")
+    if "type=ws" in lines[4] or "cloudflare-ws-tls" in lines[4]: raise SystemExit("FATAL: NODE5 regression to WebSocket detected")
 print(f"SUBSCRIPTION_ENDPOINT_INVARIANT=PASS public={public} tcp={tcp['domain']}:{tcp['port']} nodes={expected}")
 print(f"SUBSCRIPTION_COUNT={len(lines)}")
 PY
@@ -67,4 +69,5 @@ xray run -config "$C" & XP=$!; GP=""; CFP=""; trap 'kill "$XP" "$GP" "$CFP" 2>/d
 wait_port(){ h="$1"; p="$2"; label="$3"; i=0; while :; do if python3 -c 'import socket,sys;s=socket.create_connection((sys.argv[1],int(sys.argv[2])),1);s.close()' "$h" "$p" 2>/dev/null; then echo "READY_CHECK=$label:$p"; return 0; fi; if ! kill -0 "$XP" 2>/dev/null; then echo "FATAL: xray exited before $label:$p" >&2; exit 1; fi; i=$((i+1)); [ "$i" -lt "${READY_TIMEOUT:-90}" ] || { echo "FATAL: readiness timeout $label:$p" >&2; exit 1; }; sleep 1; done; }
 wait_port 127.0.0.1 10086 xhttp-http; wait_port 127.0.0.1 10087 raw-reality-vision; wait_port 127.0.0.1 10088 xhttp-reality; wait_port 127.0.0.1 10089 grpc-reality
 if [ "$CF_ENABLED" = 1 ]; then wait_port 127.0.0.1 "$CF_PORT_STATE" cloudflare-xhttp-origin; fi
+echo "BUILD_ID=$BUILD_ID SOURCE_BUILD=$SOURCE_BUILD NODE5=VLESS_XHTTP_TLS_CLOUDFLARE"
 exec python3 /opt/xray/scripts/gateway.py
