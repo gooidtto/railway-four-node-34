@@ -15,7 +15,7 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=stable-node5-grpc-reality-v7 \
+ENV BUILD_ID=stable-node5-grpc-reality-v8 \
     SOURCE_BUILD=main-hardened-v4 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
