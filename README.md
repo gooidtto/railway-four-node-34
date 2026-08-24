@@ -2,9 +2,9 @@
 
 A single-service Railway deployment that provides an Xray gateway, dynamic Railway endpoint discovery, subscription generation, and an optional Cloudflare Tunnel node.
 
-## Repository status
+## Release baseline
 
-- **Release branch:** `fix-5node-lifecycle-2026-08-24`
+- **Release branch:** `release-5node-xhttp-cloudflare-v3-2026-08-24`
 - **Runtime model:** 4 Railway base nodes + optional Cloudflare XHTTP node
 - **Persistent state:** `/data`
 - **Gateway:** `8080`
@@ -29,7 +29,7 @@ Railway networking is discovered at runtime. Public domains, TCP proxy hosts/por
 
 ## Deployment
 
-1. Deploy the repository to a Railway project.
+1. Deploy **this release branch** to a Railway project.
 2. Add a persistent Volume mounted at `/data`.
 3. Create the Railway Public Domain.
 4. Create a Railway TCP Proxy whose **target port is `8080`**.
@@ -50,7 +50,7 @@ CLOUDFLARE_XHTTP_PORT
 CLOUDFLARE_XHTTP_PATH
 ```
 
-The older `WS_PORT` / `WS_PATH` names remain accepted as compatibility fallbacks, but new deployments should use the explicit `CLOUDFLARE_XHTTP_*` names.
+The older `WS_PORT` / `WS_PATH` names are accepted only as compatibility fallbacks. New deployments should use the explicit `CLOUDFLARE_XHTTP_*` names.
 
 The Cloudflare published application should map the public hostname to the local HTTP XHTTP origin represented by `CLOUDFLARE_ORIGIN_SERVICE` and `CLOUDFLARE_XHTTP_PORT`, using `CLOUDFLARE_XHTTP_PATH`. The public hostname remains HTTPS while the local origin is HTTP.
 
