@@ -5,7 +5,7 @@ A single-service Railway deployment that provides an Xray gateway, dynamic Railw
 ## Repository status
 
 - **Release branch:** `fix-5node-lifecycle-2026-08-24`
-- **Runtime model:** 4 Railway base nodes + optional Cloudflare node
+- **Runtime model:** 4 Railway base nodes + optional Cloudflare XHTTP node
 - **Persistent state:** `/data`
 - **Gateway:** `8080`
 - **Readiness:** `/ready`
@@ -21,7 +21,9 @@ A single-service Railway deployment that provides an Xray gateway, dynamic Railw
 
 ### Optional node
 
-5. Cloudflare WS TLS, enabled only when the Cloudflare Tunnel configuration is complete.
+5. **Cloudflare XHTTP TLS**, enabled only when the Cloudflare Tunnel configuration is complete.
+
+The public connection to Node 5 is HTTPS/TLS at the Cloudflare hostname. Cloudflare Tunnel forwards the published application to the local XHTTP origin over HTTP. The local Xray Node 5 therefore uses `network=xhttp`, `security=none`; TLS is terminated at the Cloudflare edge. Cloudflare supports published HTTP/HTTPS applications through Tunnel and maps a public hostname to a local service. citeturn0search0turn0search3
 
 Railway networking is discovered at runtime. Public domains, TCP proxy hosts/ports, project identifiers, and generated credentials are not hard-coded.
 
@@ -47,6 +49,8 @@ WS_PORT
 WS_PATH
 ```
 
+For the Cloudflare published application, configure the tunnel hostname to the local XHTTP service represented by `CLOUDFLARE_ORIGIN_SERVICE`/`WS_PORT`, using the XHTTP path in `WS_PATH`. The public hostname remains HTTPS; the origin service may be HTTP because TLS is terminated at Cloudflare. Cloudflare documents HTTP and HTTPS as supported published-application service types. citeturn0search3turn0search6
+
 ## Runtime invariants
 
 The runtime treats current Railway networking as authoritative. Persistent state is used for identity continuity and change detection, not as an authority for stale endpoints.
@@ -60,7 +64,7 @@ The expected subscription order is:
 2: raw-reality-vision
 3: xhttp-reality
 4: grpc-reality
-5: cloudflare-ws-tls (when enabled)
+5: cloudflare-xhttp-tls (when enabled)
 ```
 
 ## Health checks
