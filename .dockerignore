@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+README.md
+STRUCTURE.md
+RELEASE-MANIFEST.json
+dist
+build
+*.zip
+*.log
+*.tmp
+*.bak
+.env
+.env.*
+!.env.example
