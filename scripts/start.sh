@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 umask 077
-BUILD_ID="fix-5node-lifecycle-v2"
-SOURCE_BUILD="fix-5node-lifecycle-v1"
+BUILD_ID="fix-5node-lifecycle-v3"
+SOURCE_BUILD="fix-5node-lifecycle-v2"
 D="${RAILWAY_VOLUME_MOUNT_PATH:-${DATA_DIR:-/data}}"
 C="${XRAY_CONFIG:-${D}/config.json}"
 mkdir -p "$D" "$(dirname "$C")"
@@ -35,11 +35,6 @@ import json,sys
 v=json.load(open(sys.argv[1])).get("cloudflare",{}).get("ws_port"); print(v if v is not None else "")
 PY
 )
-FINGERPRINT=$(python3 - "$RUNTIME" <<'PY'
-import json,sys
-print(json.load(open(sys.argv[1])).get("fingerprint", ""))
-PY
-)
 python3 - "$D/subscription.txt" "$RUNTIME" "$UUID" <<'PY'
 import json,re,sys
 from pathlib import Path
@@ -70,18 +65,6 @@ PY
 xray run -test -config "$C"
 xray run -config "$C" & XP=$!; GP=""; CFP=""; trap 'kill "$XP" "$GP" "$CFP" 2>/dev/null || true; wait "$XP" 2>/dev/null || true; wait "$GP" 2>/dev/null || true; wait "$CFP" 2>/dev/null || true' INT TERM EXIT
 wait_port(){ h="$1"; p="$2"; label="$3"; i=0; while :; do if python3 -c 'import socket,sys;s=socket.create_connection((sys.argv[1],int(sys.argv[2])),1);s.close()' "$h" "$p" 2>/dev/null; then echo "READY_CHECK=$label:$p"; return 0; fi; if ! kill -0 "$XP" 2>/dev/null; then echo "FATAL: xray exited before $label:$p" >&2; exit 1; fi; i=$((i+1)); [ "$i" -lt "${READY_TIMEOUT:-90}" ] || { echo "FATAL: readiness timeout $label:$p" >&2; exit 1; }; sleep 1; done; }
-wait_http_ready(){ url="$1"; label="$2"; i=0; while :; do if python3 - "$url" <<'PY'
-import sys,urllib.request
-try: urllib.request.urlopen(sys.argv[1],timeout=2).read(); raise SystemExit(0)
-except Exception: raise SystemExit(1)
-PY
-then echo "READY_CHECK=$label"; return 0; fi; i=$((i+1)); [ "$i" -lt "${CLOUDFLARE_READY_TIMEOUT:-45}" ] || { echo "FATAL: readiness timeout $label" >&2; exit 1; }; sleep 1; done; }
 wait_port 127.0.0.1 10086 xhttp-http; wait_port 127.0.0.1 10087 raw-reality-vision; wait_port 127.0.0.1 10088 xhttp-reality; wait_port 127.0.0.1 10089 grpc-reality
 if [ "$CF_ENABLED" = 1 ]; then wait_port 127.0.0.1 "$CF_PORT_STATE" cloudflare-ws-origin; fi
-python3 /opt/xray/scripts/gateway.py & GP=$!; wait_port 127.0.0.1 8080 protocol-router
-if [ "$CF_ENABLED" = 1 ]; then write_secret "$CF_TOKEN_FILE" "$CF_TOKEN"; echo "CLOUDFLARE_WS=enabled"; echo "CLOUDFLARE_PUBLIC_HOSTNAME=$CF_HOST"; echo "CLOUDFLARE_TUNNEL_PROTOCOL=${TUNNEL_TRANSPORT_PROTOCOL:-http2}"; cloudflared --no-autoupdate --loglevel info --protocol "${TUNNEL_TRANSPORT_PROTOCOL:-http2}" tunnel --metrics 127.0.0.1:2000 run --token-file "$CF_TOKEN_FILE" >"$D/cloudflared.log" 2>&1 & CFP=$!; sleep 1; kill -0 "$CFP" 2>/dev/null || { echo "FATAL: cloudflared exited during startup" >&2; tail -n 120 "$D/cloudflared.log" >&2 || true; exit 1; }; wait_http_ready "http://127.0.0.1:2000/ready" cloudflared-tunnel; else echo "CLOUDFLARE_WS=disabled"; fi
-SUB_URL="https://${PUBLIC_DOMAIN}/sub/${TOKEN}"
-printf '%s\n' "$SUB_URL" >"$D/subscription_url.txt"; chmod 600 "$D/subscription_url.txt"
-echo "RELEASE=$BUILD_ID"; echo "SOURCE_BUILD=$SOURCE_BUILD"; echo "RUNTIME_FINGERPRINT=$FINGERPRINT"; echo "NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality,5:cloudflare-ws-tls"; echo "TCP=$TCP_HOST:$TCP_PORT -> 8080"; echo "SUBSCRIPTION_URL=$SUB_URL"; echo "NODES=$EXPECTED"
-while kill -0 "$XP" 2>/dev/null && kill -0 "$GP" 2>/dev/null; do if [ "$CF_ENABLED" = 1 ] && ! kill -0 "$CFP" 2>/dev/null; then echo "FATAL: cloudflared exited" >&2; tail -n 120 "$D/cloudflared.log" >&2 || true; exit 1; fi; sleep 5; done
-echo "FATAL: supervised process exited" >&2; exit 1
+exec python3 /opt/xray/scripts/gateway.py
