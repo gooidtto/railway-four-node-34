@@ -15,8 +15,8 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=railway-production-v5 \
-    SOURCE_BUILD=6afe981f6063e8c7f0db4b7791dcd9b81808fa37 \
+ENV BUILD_ID=stable-node5-grpc-reality-v5 \
+    SOURCE_BUILD=main-hardened-v4 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
@@ -28,6 +28,9 @@ ENV BUILD_ID=railway-production-v5 \
     REALITY_FINGERPRINT=chrome \
     REALITY_XHTTP_SNI=www.apple.com \
     REALITY_XHTTP_TARGET=www.apple.com:443 \
+    REALITY_GRPC_SNI=www.bing.com \
+    REALITY_GRPC_TARGET=www.bing.com:443 \
+    GRPC_SERVICE_NAME=grpc-service \
     XHTTP_PATH=/xhttp \
     READY_TIMEOUT=90 \
     CLOUDFLARE_READY_TIMEOUT=45 \
