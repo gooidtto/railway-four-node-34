@@ -19,7 +19,12 @@ RUNTIME = D / "runtime.json"
 HTTP_DEST = ("127.0.0.1", 10086)
 RAW_SNI = os.environ.get("REALITY_RAW_SNI", "www.cloudflare.com").strip().lower().rstrip(".") or "www.cloudflare.com"
 XHTTP_SNI = os.environ.get("REALITY_XHTTP_SNI", "www.apple.com").strip().lower().rstrip(".") or "www.apple.com"
-ROUTES = {RAW_SNI: ("127.0.0.1", 10087, "raw-reality-vision"), XHTTP_SNI: ("127.0.0.1", 10088, "xhttp-reality")}
+GRPC_SNI = os.environ.get("REALITY_GRPC_SNI", "www.bing.com").strip().lower().rstrip(".") or "www.bing.com"
+ROUTES = {
+    RAW_SNI: ("127.0.0.1", 10087, "raw-reality-vision"),
+    XHTTP_SNI: ("127.0.0.1", 10088, "xhttp-reality"),
+    GRPC_SNI: ("127.0.0.1", 10089, "grpc-reality"),
+}
 MAX_CONNECTIONS = max(16, int(os.environ.get("GATEWAY_MAX_CONNECTIONS", "512")))
 INITIAL_TIMEOUT = max(2.0, float(os.environ.get("GATEWAY_READ_TIMEOUT", "20")))
 UPSTREAM_TIMEOUT = max(2.0, float(os.environ.get("GATEWAY_UPSTREAM_TIMEOUT", "10")))
@@ -34,7 +39,7 @@ log = logging.getLogger("gateway")
 def expected_nodes():
     try:
         n = int(json.loads(RUNTIME.read_text()).get("nodes", {}).get("count", 0))
-        return n if n in (3, 4) else 0
+        return n if n in (4, 5) else 0
     except Exception:
         return 0
 
@@ -61,11 +66,11 @@ def cloudflare_ready():
 
 def readiness():
     expected = expected_nodes()
-    if expected not in (3, 4): return False, "runtime"
+    if expected not in (4, 5): return False, "runtime"
     if not RUNTIME.exists() or not SUB.exists() or not TOKEN.exists(): return False, "state"
     lines = [x.strip() for x in SUB.read_text().splitlines() if x.strip()]
     if len(lines) != expected or any(not x.startswith("vless://") for x in lines): return False, "subscription"
-    for port, label in ((10086, "xhttp-http"), (10087, "raw-reality"), (10088, "xhttp-reality")):
+    for port, label in ((10086, "xhttp-http"), (10087, "raw-reality"), (10088, "xhttp-reality"), (10089, "grpc-reality")):
         if not local_port_ready(port): return False, label
     if not cloudflare_ready(): return False, "cloudflare"
     return True, "ready"
@@ -76,7 +81,7 @@ def subscription(token):
     if not SUB.exists(): return None, "SUB_MISSING"
     lines = [x.strip() for x in SUB.read_text().splitlines() if x.strip()]
     expected = expected_nodes()
-    if expected not in (3, 4): return None, "RUNTIME_INVALID"
+    if expected not in (4, 5): return None, "RUNTIME_INVALID"
     if len(lines) != expected or any(not x.startswith("vless://") for x in lines): return None, "SUB_INVALID"
     return base64.b64encode("\n".join(lines).encode()), "OK"
 
@@ -119,7 +124,6 @@ def _parse_client_hello_sni(handshake):
 
 
 def _tls_client_hello(buf):
-    """Parse TLS records; tolerate TCP fragmentation and handshake messages split across records."""
     if len(buf) < 5 or buf[0] != 0x16 or buf[1] != 0x03:
         return False, None
     pos = 0
@@ -155,8 +159,6 @@ def tls_sni(buf):
     complete, sni = _tls_client_hello(buf)
     if sni:
         return sni
-    # Last-resort extraction for the two explicit routing names. This also
-    # works while the TLS ClientHello is still fragmented across TCP reads.
     low = bytes(buf).lower()
     for candidate in ROUTES:
         if candidate.encode("ascii") in low:
@@ -181,9 +183,6 @@ async def read_initial(reader):
             if b"\r\n\r\n" in b or len(b) > 8192:
                 return b
         elif len(b) >= 3 and b[0] == 0x16 and b[1] == 0x03:
-            # Do the explicit SNI scan on every read, not only after a whole
-            # ClientHello has been reassembled. Railway TCP Proxy may fragment
-            # the ClientHello at arbitrary TCP boundaries.
             complete, sni = _tls_client_hello(b)
             if complete or sni:
                 return b
@@ -281,17 +280,21 @@ async def http(reader, writer, initial):
 
 async def handle(reader, writer):
     peer = writer.get_extra_info("peername")
+    log.warning("TCP_ACCEPT peer=%s local=%s", peer, writer.get_extra_info("sockname"))
     async with SEM:
         try:
             initial = await read_initial(reader)
             if not initial: return
+            log.warning("INITIAL_RECEIVED peer=%s bytes=%d first=0x%s", peer, len(initial), initial[:1].hex() if initial else "-")
             if initial.startswith(HTTP):
+                log.warning("PROTOCOL_DETECTED peer=%s protocol=http", peer)
                 await http(reader, writer, initial); return
             if initial[:1] == b"\x16" and len(initial) >= 3 and initial[1] == 0x03:
                 sni = tls_sni(initial)
                 log.warning("TLS_SNI peer=%s sni=%s initial=%d", peer, sni or "-", len(initial))
                 route = ROUTES.get(sni or "")
                 if route:
+                    log.warning("ROUTE_MATCH peer=%s sni=%s route=%s dest=%s:%s", peer, sni, route[2], route[0], route[1])
                     await relay(reader, writer, initial, (route[0], route[1]), route[2], sni); return
                 log.warning("ROUTE_REJECT tls_sni=%s peer=%s initial=%d", sni or "-", peer, len(initial)); return
             log.warning("ROUTE_REJECT unknown_protocol=0x%s peer=%s", initial[:1].hex() if initial else "-", peer)
