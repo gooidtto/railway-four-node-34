@@ -13,12 +13,11 @@
 │   ├── guard.sh                  Startup and production validation
 │   ├── generate.py               Runtime config + subscription generator
 │   ├── gateway.py                HTTP/TCP gateway and subscription endpoint
-│   └── runtime-manifest.py       Runtime manifest generation
+│   └── runtime-manifest.py       Runtime deployment metadata generation
 ├── site/
 │   └── index.html                Public landing/status page
 ├── Dockerfile                    Reproducible runtime image
 ├── railway.toml                  Railway deployment configuration
-├── RELEASE-MANIFEST.json         Release metadata
 ├── README.md                     Deployment and architecture documentation
 ├── .gitignore                    Local/generated-file exclusions
 └── .dockerignore                 Docker build-context exclusions
@@ -30,4 +29,6 @@ Generated credentials, subscription state, runtime manifests, logs, and other mu
 
 ## Source of truth
 
-Static repository files define the executable implementation. Railway runtime networking is authoritative for generated public endpoints. Persistent `/data` state is used for identity continuity and change detection only.
+Static repository files define the executable implementation. Current Railway runtime networking is authoritative for generated public endpoints. Persistent `/data` state is used for identity continuity and change detection only.
+
+`RELEASE-MANIFEST.json` is intentionally not part of the repository or runtime model.
