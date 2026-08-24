@@ -13,9 +13,17 @@ COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
-RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-lifecycle-v2 \
-    SOURCE_BUILD=fix-5node-lifecycle-v1 \
+RUN sed -i \
+    -e 's/log\.warning("TCP_ACCEPT/log\.info("TCP_ACCEPT/' \
+    -e 's/log\.warning("ROUTE_SELECTED/log\.info("ROUTE_SELECTED/' \
+    -e 's/log\.warning("UPSTREAM_CONNECT_OK/log\.info("UPSTREAM_CONNECT_OK/' \
+    -e 's/log\.warning("INITIAL_FORWARDED/log\.debug("INITIAL_FORWARDED/' \
+    -e 's/log\.warning("SUBSCRIPTION_HTTP_RENDER=PASS/log\.info("SUBSCRIPTION_HTTP_RENDER=PASS/' \
+    /opt/xray/scripts/gateway.py && \
+    sed -i 's/print("NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality,5:cloudflare-ws-tls",flush=True)/print(f"RAILWAY_BASE_NODES=4",flush=True); print("SUBSCRIPTION_NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality" + (",5:cloudflare-ws-tls" if CF_ENABLED else ""),flush=True)/' /opt/xray/scripts/generate.py && \
+    chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
+ENV BUILD_ID=fix-5node-lifecycle-v3 \
+    SOURCE_BUILD=fix-5node-lifecycle-v2 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
