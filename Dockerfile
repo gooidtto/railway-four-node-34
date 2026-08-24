@@ -14,8 +14,8 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-lifecycle-v1 \
-    SOURCE_BUILD=main-baseline \
+ENV BUILD_ID=fix-5node-lifecycle-v2 \
+    SOURCE_BUILD=fix-5node-lifecycle-v1 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
