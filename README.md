@@ -4,7 +4,7 @@ A single-service Railway deployment that provides an Xray gateway, dynamic Railw
 
 ## Repository status
 
-- **Release branch:** `fix-5node-lifecycle-2026-08-24`
+- **Release branch:** `release-5node-xhttp-cloudflare-v3-2026-08-24`
 - **Runtime model:** 4 Railway base nodes + optional Cloudflare XHTTP node
 - **Persistent state:** `/data`
 - **Gateway:** `8080`
@@ -23,18 +23,20 @@ A single-service Railway deployment that provides an Xray gateway, dynamic Railw
 
 5. **Cloudflare XHTTP TLS**, enabled only when the Cloudflare Tunnel configuration is complete.
 
-The public connection to Node 5 is HTTPS/TLS at the Cloudflare hostname. Cloudflare Tunnel forwards the published application to the local XHTTP origin over HTTP. The local Xray Node 5 therefore uses `network=xhttp`, `security=none`; TLS is terminated at the Cloudflare edge. Cloudflare supports published HTTP/HTTPS applications through Tunnel and maps a public hostname to a local service. citeturn0search0turn0search3
+The public connection to Node 5 is HTTPS/TLS at the Cloudflare hostname. Cloudflare Tunnel forwards the published application to the local XHTTP origin over HTTP. The local Xray Node 5 therefore uses `network=xhttp`, `security=none`; TLS is terminated at the Cloudflare edge.
 
 Railway networking is discovered at runtime. Public domains, TCP proxy hosts/ports, project identifiers, and generated credentials are not hard-coded.
 
 ## Deployment
 
-1. Deploy the repository to a Railway project.
+1. Deploy **this release branch** to a Railway project.
 2. Add a persistent Volume mounted at `/data`.
-3. Create a Railway Public Domain.
-4. Create a Railway TCP Proxy targeting internal port `8080`.
-5. Redeploy after networking resources are available.
-6. Verify `GET /ready` returns HTTP `200` before using the subscription endpoint.
+3. Create the Railway Public Domain.
+4. Create one Railway TCP Proxy targeting internal port `8080`.
+5. After creating or changing Railway Networking, **redeploy** so the container discovers the current public domain and TCP Proxy endpoint.
+6. Verify `GET /ready` returns HTTP `200` before using the generated subscription.
+
+The application can verify the endpoint values exposed by the current Railway environment, but the actual Railway TCP Proxy target is configured in Railway Networking. The repository therefore records `8080` as the expected target and validates the local gateway listeners; it does not pretend that the target-port setting can be read from an environment variable.
 
 ### Cloudflare node
 
@@ -45,17 +47,17 @@ CLOUDFLARE_TUNNEL_TOKEN
 CLOUDFLARE_TUNNEL_ID
 CLOUDFLARE_PUBLIC_HOSTNAME
 CLOUDFLARE_ORIGIN_SERVICE
-WS_PORT
-WS_PATH
+CLOUDFLARE_XHTTP_PORT
+CLOUDFLARE_XHTTP_PATH
 ```
 
-For the Cloudflare published application, configure the tunnel hostname to the local XHTTP service represented by `CLOUDFLARE_ORIGIN_SERVICE`/`WS_PORT`, using the XHTTP path in `WS_PATH`. The public hostname remains HTTPS; the origin service may be HTTP because TLS is terminated at Cloudflare. Cloudflare documents HTTP and HTTPS as supported published-application service types. citeturn0search3turn0search6
+`WS_PORT` and `WS_PATH` remain accepted only as legacy aliases for backwards compatibility. New deployments should use the `CLOUDFLARE_XHTTP_*` names.
 
 ## Runtime invariants
 
 The runtime treats current Railway networking as authoritative. Persistent state is used for identity continuity and change detection, not as an authority for stale endpoints.
 
-The gateway validates the generated subscription against the current runtime before serving it. A valid runtime must expose either 4 or 5 nodes, and the subscription count must match the runtime node count.
+The deployment requires exactly four Railway base nodes and optionally a fifth Cloudflare XHTTP node. The subscription count must match the runtime node count.
 
 The expected subscription order is:
 
@@ -66,6 +68,8 @@ The expected subscription order is:
 4: grpc-reality
 5: cloudflare-xhttp-tls (when enabled)
 ```
+
+The same UUID is persisted in `/data/uuid.txt`, so a normal container restart does not silently invalidate an existing subscription.
 
 ## Health checks
 
@@ -80,9 +84,8 @@ The expected subscription order is:
 ├── config/                  # Static runtime inputs
 ├── scripts/                 # Boot, generation, gateway, guard and runtime logic
 ├── site/                    # Minimal HTTP landing page
-├── Dockerfile               # Reproducible runtime image
+├── Dockerfile               # Reproducible runtime image + build-time invariants
 ├── railway.toml             # Railway deployment configuration
-├── RELEASE-MANIFEST.json    # Release metadata
 ├── STRUCTURE.md             # Repository structure reference
 ├── .gitignore               # Local/generated-file exclusions
 └── .dockerignore            # Docker build-context exclusions
@@ -90,7 +93,7 @@ The expected subscription order is:
 
 ## Release packaging
 
-The repository includes a GitHub Actions workflow that creates a ZIP archive and SHA-256 checksum for the release branch. Release archives are build artifacts and are intentionally excluded from Git tracking.
+The GitHub Actions workflow is locked to this release branch. It validates the Node 5 XHTTP definition and the Node 2–4 gateway routes before producing the ZIP and SHA-256 checksum.
 
 ## Security
 
