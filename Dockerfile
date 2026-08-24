@@ -1,30 +1,20 @@
 # syntax=docker/dockerfile:1
 ARG XRAY_VERSION=26.3.27
 ARG CLOUDFLARED_VERSION=2026.7.3
+ARG REPOSITORY_RELEASE=upload-baseline-2026-08-24
 FROM ghcr.io/xtls/xray-core:${XRAY_VERSION} AS xray
 FROM cloudflare/cloudflared:${CLOUDFLARED_VERSION} AS cloudflared
 FROM python:3.12-alpine3.22
 ARG XRAY_VERSION
 ARG CLOUDFLARED_VERSION
-ENV XRAY_VERSION=${XRAY_VERSION} CLOUDFLARED_VERSION=${CLOUDFLARED_VERSION} PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-RUN apk add --no-cache openssl ca-certificates && mkdir -p /etc/xray /data /opt/xray/scripts /opt/xray/config /opt/xray/site
-COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
-COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
-COPY scripts/ /opt/xray/scripts/
-COPY config/ /opt/xray/config/
-COPY site/ /opt/xray/site/
-# Keep runtime source immutable: never patch protocol definitions during image build.
-# The build must fail if Node 5 regresses to the deprecated WebSocket transport.
-RUN python3 -m py_compile /opt/xray/scripts/*.py && \
-    grep -q 'vless-xhttp-cloudflare' /opt/xray/scripts/generate.py && \
-    grep -q 'type":"xhttp"' /opt/xray/scripts/generate.py && \
-    grep -q 'cloudflare-xhttp-tls' /opt/xray/scripts/generate.py && \
-    ! grep -q 'cloudflare-ws-tls' /opt/xray/scripts/generate.py && \
-    ! grep -q 'type":"ws"' /opt/xray/scripts/generate.py && \
-    chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && \
-    chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-xhttp-cloudflare-v3 \
-    SOURCE_BUILD=fix-5node-xhttp-cloudflare-v2 \
+ARG REPOSITORY_RELEASE
+ENV XRAY_VERSION=${XRAY_VERSION} \
+    CLOUDFLARED_VERSION=${CLOUDFLARED_VERSION} \
+    REPOSITORY_RELEASE=${REPOSITORY_RELEASE} \
+    BUILD_ID=${REPOSITORY_RELEASE} \
+    SOURCE_BUILD=${REPOSITORY_RELEASE} \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
@@ -48,7 +38,29 @@ ENV BUILD_ID=fix-5node-xhttp-cloudflare-v3 \
     GATEWAY_IDLE_TIMEOUT=900 \
     GATEWAY_MAX_INITIAL=131072 \
     GATEWAY_LOGLEVEL=INFO
-RUN echo "SOURCE_BUILD=${SOURCE_BUILD} BUILD_ID=${BUILD_ID} NODE5=VLESS_XHTTP_TLS_CLOUDFLARE"
+RUN apk add --no-cache openssl ca-certificates && \
+    mkdir -p /etc/xray /data /opt/xray/scripts /opt/xray/config /opt/xray/site
+COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
+COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+COPY scripts/ /opt/xray/scripts/
+COPY config/ /opt/xray/config/
+COPY site/ /opt/xray/site/
+# Build-time integrity checks. Runtime values must come from the checked-out repository
+# and current Railway environment; the image must never rewrite protocol definitions.
+RUN python3 -m py_compile /opt/xray/scripts/*.py && \
+    grep -q 'upload-baseline-2026-08-24' /opt/xray/scripts/generate.py && \
+    grep -q 'upload-baseline-2026-08-24' /opt/xray/scripts/start.sh && \
+    grep -q 'vless-xhttp-cloudflare' /opt/xray/scripts/generate.py && \
+    grep -q 'type":"xhttp"' /opt/xray/scripts/generate.py && \
+    grep -q 'cloudflare-xhttp-tls' /opt/xray/scripts/generate.py && \
+    ! grep -q 'cloudflare-ws-tls' /opt/xray/scripts/generate.py && \
+    ! grep -q 'type":"ws"' /opt/xray/scripts/generate.py && \
+    grep -q '10087' /opt/xray/scripts/gateway.py && \
+    grep -q '10088' /opt/xray/scripts/gateway.py && \
+    grep -q '10089' /opt/xray/scripts/gateway.py && \
+    chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && \
+    chmod 0644 /opt/xray/config/* /opt/xray/site/*
+RUN printf 'REPOSITORY_RELEASE=%s\nBUILD_ID=%s\nSOURCE_BUILD=%s\nXRAY_VERSION=%s\nCLOUDFLARED_VERSION=%s\n' "$REPOSITORY_RELEASE" "$BUILD_ID" "$SOURCE_BUILD" "$XRAY_VERSION" "$CLOUDFLARED_VERSION" > /opt/xray/BUILD-INFO
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=8).read()"
 WORKDIR /opt/xray
