@@ -21,12 +21,10 @@ RUN sed -i \
     -e 's/log\\.warning("INITIAL_FORWARDED/log.debug("INITIAL_FORWARDED/' \
     -e 's/log\\.warning("SUBSCRIPTION_HTTP_RENDER=PASS/log.info("SUBSCRIPTION_HTTP_RENDER=PASS/' \
     /opt/xray/scripts/gateway.py && \
-    sed -i 's/BUILD_ID="fix-5node-lifecycle-v2"/BUILD_ID="fix-5node-lifecycle-v3"/; s/SOURCE_BUILD="fix-5node-lifecycle-v1"/SOURCE_BUILD="fix-5node-lifecycle-v2"/' /opt/xray/scripts/start.sh && \
-    sed -i 's/print("NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality,5:cloudflare-ws-tls",flush=True)/print(f"RAILWAY_BASE_NODES=4",flush=True); print("SUBSCRIPTION_NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality" + (",5:cloudflare-ws-tls" if CF_ENABLED else ""),flush=True)/' /opt/xray/scripts/generate.py && \
     python3 -m py_compile /opt/xray/scripts/*.py && \
     chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-lifecycle-v3 \
-    SOURCE_BUILD=fix-5node-lifecycle-v2 \
+ENV BUILD_ID=fix-5node-xhttp-cloudflare-v1 \
+    SOURCE_BUILD=fix-5node-lifecycle-v3 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
