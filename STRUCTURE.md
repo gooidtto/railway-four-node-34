@@ -16,9 +16,8 @@
 │   └── runtime-manifest.py       Runtime manifest generation
 ├── site/
 │   └── index.html                Public landing/status page
-├── Dockerfile                    Reproducible runtime image
+├── Dockerfile                    Reproducible runtime image + build invariants
 ├── railway.toml                  Railway deployment configuration
-├── RELEASE-MANIFEST.json         Release metadata
 ├── README.md                     Deployment and architecture documentation
 ├── .gitignore                    Local/generated-file exclusions
 └── .dockerignore                 Docker build-context exclusions
@@ -31,3 +30,5 @@ Generated credentials, subscription state, runtime manifests, logs, and other mu
 ## Source of truth
 
 Static repository files define the executable implementation. Railway runtime networking is authoritative for generated public endpoints. Persistent `/data` state is used for identity continuity and change detection only.
+
+The release package does not contain a separate release manifest. Version/build identity is carried by the release branch, Docker build metadata, and runtime logs.
