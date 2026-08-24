@@ -1,23 +1,26 @@
 {
-  "release": "fix-5node-lifecycle-v3",
-  "architecture": "single-8080-router-with-four-railway-base-nodes-and-optional-cloudflare-ws-node",
+  "release": "fix-5node-xhttp-cloudflare-v1",
+  "architecture": "single-8080-router-with-four-railway-base-nodes-and-optional-cloudflare-xhttp-node",
   "base_nodes": 4,
   "max_nodes": 5,
   "application_port": 8080,
   "entries": {
     "443": "railway-xhttp-tls",
     "tcp-proxy": "raw-reality-vision + xhttp-reality + grpc-reality",
-    "cloudflare": "optional-ws-tls"
+    "cloudflare": "optional-xhttp-tls"
   },
   "routing": {
     "http": 10086,
     "raw_reality_sni": 10087,
     "xhttp_reality_sni": 10088,
     "grpc_reality_sni": 10089,
-    "cloudflare_ws": "optional"
+    "cloudflare_xhttp": "optional"
   },
   "source_of_truth": "runtime-railway-networking",
   "subscription_nodes": 4,
   "optional_cloudflare_node": 5,
+  "cloudflare_transport": "xhttp",
+  "cloudflare_public_security": "tls",
+  "cloudflare_origin_protocol": "http",
   "cloudflare_enablement": "CLOUDFLARE_TUNNEL_TOKEN + CLOUDFLARE_TUNNEL_ID + CLOUDFLARE_PUBLIC_HOSTNAME + CLOUDFLARE_ORIGIN_SERVICE + WS_PORT + WS_PATH"
 }
