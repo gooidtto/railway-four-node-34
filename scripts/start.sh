@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 umask 077
-BUILD_ID="upload-baseline-2026-08-24"
-SOURCE_BUILD="upload-baseline-2026-08-24"
+BUILD_ID="repo-current"
+SOURCE_BUILD="repo-current"
 D="${RAILWAY_VOLUME_MOUNT_PATH:-${DATA_DIR:-/data}}"
 C="${XRAY_CONFIG:-${D}/config.json}"
 mkdir -p "$D" "$(dirname "$C")"
@@ -69,5 +69,5 @@ xray run -config "$C" & XP=$!; GP=""; CFP=""; trap 'kill "$XP" "$GP" "$CFP" 2>/d
 wait_port(){ h="$1"; p="$2"; label="$3"; i=0; while :; do if python3 -c 'import socket,sys;s=socket.create_connection((sys.argv[1],int(sys.argv[2])),1);s.close()' "$h" "$p" 2>/dev/null; then echo "READY_CHECK=$label:$p"; return 0; fi; if ! kill -0 "$XP" 2>/dev/null; then echo "FATAL: xray exited before $label:$p" >&2; exit 1; fi; i=$((i+1)); [ "$i" -lt "${READY_TIMEOUT:-90}" ] || { echo "FATAL: readiness timeout $label:$p" >&2; exit 1; }; sleep 1; done; }
 wait_port 127.0.0.1 10086 xhttp-http; wait_port 127.0.0.1 10087 raw-reality-vision; wait_port 127.0.0.1 10088 xhttp-reality; wait_port 127.0.0.1 10089 grpc-reality
 if [ "$CF_ENABLED" = 1 ]; then wait_port 127.0.0.1 "$CF_PORT_STATE" cloudflare-xhttp-origin; fi
-echo "RELEASE=$BUILD_ID SOURCE_BUILD=$SOURCE_BUILD NODE5=VLESS_XHTTP_TLS_CLOUDFLARE"
+echo "BUILD_ID=$BUILD_ID SOURCE_BUILD=$SOURCE_BUILD NODE5=VLESS_XHTTP_TLS_CLOUDFLARE"
 exec python3 /opt/xray/scripts/gateway.py
