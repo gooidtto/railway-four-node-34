@@ -23,8 +23,8 @@ RUN sed -i \
     /opt/xray/scripts/gateway.py && \
     python3 -m py_compile /opt/xray/scripts/*.py && \
     chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
-ENV BUILD_ID=fix-5node-xhttp-cloudflare-v1 \
-    SOURCE_BUILD=fix-5node-lifecycle-v3 \
+ENV BUILD_ID=fix-5node-xhttp-cloudflare-v2 \
+    SOURCE_BUILD=fix-5node-xhttp-cloudflare-v1 \
     NODE_MODE=auto \
     EXPECTED_NODES=auto \
     PORT=8080 \
