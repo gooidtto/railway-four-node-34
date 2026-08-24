@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 umask 077
-BUILD_ID="stable-node5-grpc-reality-v5"
+BUILD_ID="stable-node5-grpc-reality-v6"
 SOURCE_BUILD="main-hardened-v4"
 D="${RAILWAY_VOLUME_MOUNT_PATH:-${DATA_DIR:-/data}}"
 C="${XRAY_CONFIG:-${D}/config.json}"
@@ -91,8 +91,8 @@ PY
 then echo "READY_CHECK=$label"; return 0; fi; i=$((i+1)); [ "$i" -lt "${CLOUDFLARE_READY_TIMEOUT:-45}" ] || { echo "FATAL: readiness timeout $label" >&2; exit 1; }; sleep 1; done; }
 wait_port 127.0.0.1 10086 xhttp-http; wait_port 127.0.0.1 10087 raw-reality-vision; wait_port 127.0.0.1 10088 xhttp-reality; wait_port 127.0.0.1 10089 grpc-reality; if [ "$CF_ENABLED" = 1 ]; then wait_port 127.0.0.1 "$CF_PORT_STATE" cloudflare-ws-origin; fi
 python3 /opt/xray/scripts/gateway.py & GP=$!; wait_port 127.0.0.1 8080 protocol-router
-if [ "$CF_ENABLED" = 1 ]; then write_secret "$CF_TOKEN_FILE" "$CF_TOKEN"; echo "CLOUDFLARE_WS=enabled"; echo "CLOUDFLARE_PUBLIC_HOSTNAME=$CF_HOST_STATE"; echo "CLOUDFLARE_ORIGIN_SERVICE=$CF_ORIGIN_STATE"; echo "CLOUDFLARE_WS_PORT=$CF_PORT_STATE"; echo "CLOUDFLARE_WS_PATH=$CF_PATH_STATE"; cloudflared --no-autoupdate tunnel --metrics 127.0.0.1:2000 run --token-file "$CF_TOKEN_FILE" >"$D/cloudflared.log" 2>&1 & CFP=$!; sleep 1; kill -0 "$CFP" 2>/dev/null || { echo "FATAL: cloudflared exited during startup" >&2; tail -n 80 "$D/cloudflared.log" >&2 || true; exit 1; }; wait_http_ready "http://127.0.0.1:2000/ready" cloudflared-tunnel; else echo "CLOUDFLARE_WS=disabled"; fi
+if [ "$CF_ENABLED" = 1 ]; then write_secret "$CF_TOKEN_FILE" "$CF_TOKEN"; echo "CLOUDFLARE_WS=enabled"; echo "CLOUDFLARE_PUBLIC_HOSTNAME=$CF_HOST_STATE"; echo "CLOUDFLARE_ORIGIN_SERVICE=$CF_ORIGIN_STATE"; echo "CLOUDFLARE_WS_PORT=$CF_PORT_STATE"; echo "CLOUDFLARE_WS_PATH=$CF_PATH_STATE"; TUNNEL_TRANSPORT_PROTOCOL="${TUNNEL_TRANSPORT_PROTOCOL:-http2}"; echo "CLOUDFLARE_TUNNEL_PROTOCOL=$TUNNEL_TRANSPORT_PROTOCOL"; cloudflared --no-autoupdate --loglevel info --protocol "$TUNNEL_TRANSPORT_PROTOCOL" tunnel --metrics 127.0.0.1:2000 run --token-file "$CF_TOKEN_FILE" >"$D/cloudflared.log" 2>&1 & CFP=$!; sleep 1; kill -0 "$CFP" 2>/dev/null || { echo "FATAL: cloudflared exited during startup" >&2; tail -n 120 "$D/cloudflared.log" >&2 || true; exit 1; }; wait_http_ready "http://127.0.0.1:2000/ready" cloudflared-tunnel; else echo "CLOUDFLARE_WS=disabled"; fi
 printf '%s/sub/%s\n' "https://${PUBLIC_DOMAIN}" "$TOKEN" >"$D/subscription_url.txt"; chmod 600 "$D/subscription_url.txt"
 echo "RELEASE=$BUILD_ID"; echo "ARCHITECTURE=single-8080-router-plus-node5-grpc-and-optional-cloudflare-tunnel"; echo "TARGET_PORT=8080"; echo "TCP=$TCP_HOST:$TCP_PORT -> 8080"; echo "ROUTES=HTTP->10086,RAW-REALITY->10087,XHTTP-REALITY->10088,GRPC-REALITY->10089"; [ "$CF_ENABLED" = 1 ] && echo "ROUTES=CLOUDFLARE-WS->$CF_PORT_STATE"; echo "RUNTIME_FINGERPRINT=$FINGERPRINT"; echo "NODES=$EXPECTED"
-while kill -0 "$XP" 2>/dev/null && kill -0 "$GP" 2>/dev/null; do if [ "$CF_ENABLED" = 1 ] && ! kill -0 "$CFP" 2>/dev/null; then echo "FATAL: cloudflared exited" >&2; tail -n 80 "$D/cloudflared.log" >&2 || true; exit 1; fi; sleep 5; done
+while kill -0 "$XP" 2>/dev/null && kill -0 "$GP" 2>/dev/null; do if [ "$CF_ENABLED" = 1 ] && ! kill -0 "$CFP" 2>/dev/null; then echo "FATAL: cloudflared exited" >&2; tail -n 120 "$D/cloudflared.log" >&2 || true; exit 1; fi; sleep 5; done
 echo "FATAL: supervised process exited" >&2; exit 1
