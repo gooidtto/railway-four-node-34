@@ -14,8 +14,7 @@ COPY scripts/ /opt/xray/scripts/
 COPY config/ /opt/xray/config/
 COPY site/ /opt/xray/site/
 RUN sed -i \
-    -e 's/import socket/import socket\\nimport sys/' \
-    -e 's/logging.basicConfig(level=/logging.basicConfig(stream=sys.stdout, level=/' \
+    -e 's/logging.basicConfig(level=/logging.basicConfig(stream=__import__("sys").stdout, level=/' \
     -e 's/log\\.warning("TCP_ACCEPT/log.info("TCP_ACCEPT/' \
     -e 's/log\\.warning("ROUTE_SELECTED/log.info("ROUTE_SELECTED/' \
     -e 's/log\\.warning("UPSTREAM_CONNECT_OK/log.info("UPSTREAM_CONNECT_OK/' \
@@ -24,6 +23,7 @@ RUN sed -i \
     /opt/xray/scripts/gateway.py && \
     sed -i 's/BUILD_ID="fix-5node-lifecycle-v2"/BUILD_ID="fix-5node-lifecycle-v3"/; s/SOURCE_BUILD="fix-5node-lifecycle-v1"/SOURCE_BUILD="fix-5node-lifecycle-v2"/' /opt/xray/scripts/start.sh && \
     sed -i 's/print("NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality,5:cloudflare-ws-tls",flush=True)/print(f"RAILWAY_BASE_NODES=4",flush=True); print("SUBSCRIPTION_NODE_ORDER=1:railway-xhttp-tls,2:raw-reality-vision,3:xhttp-reality,4:grpc-reality" + (",5:cloudflare-ws-tls" if CF_ENABLED else ""),flush=True)/' /opt/xray/scripts/generate.py && \
+    python3 -m py_compile /opt/xray/scripts/*.py && \
     chmod 0755 /usr/local/bin/xray /usr/local/bin/cloudflared /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/* /opt/xray/site/*
 ENV BUILD_ID=fix-5node-lifecycle-v3 \
     SOURCE_BUILD=fix-5node-lifecycle-v2 \
